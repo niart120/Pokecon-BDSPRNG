@@ -1,0 +1,1 @@
+from .xorshift import Xorshift
