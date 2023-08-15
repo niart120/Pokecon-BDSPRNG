@@ -1,2 +1,3 @@
 from .munchlaxinverter import MunchlaxInverter
 from .munchlaxlinearsearch import MunchlaxLinearSearch
+from .idgeneratorext import generate_id
