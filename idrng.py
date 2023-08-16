@@ -14,8 +14,16 @@ from .bdsprnglib.rng import Xorshift
 
 import time
 
+"""
+- メニュー画面でBDSPのソフトにカーソルが合っている状態で実行してください
+- id調整を行う用のアカウントを新しく作成した上で, ゲーム起動時にそのアカウントにカーソルがあっている必要があります.
+
+また, `target_g7tid_list` または `target_tidsid_list` のいずれかのリストに目的のIDを格納してください.
+格納形式はコメントの通りです.
+"""
+
 SEARCHMAX = 100000 #検索数上限
-target_g7tid_list = [] # 整数で格納してください (例: 000827 -> 827)
+target_g7tid_list = [] # 先頭に0を付けない整数で格納してください (例: 000827 -> 827)
 target_tidsid_list = [] #(tid, sid)
 
 
@@ -50,6 +58,9 @@ class IDRNG(ImageProcPythonCommand):
             self.press(Button.HOME, wait=0.5)
             self.press(Button.X, wait=0.5)
             self.press(Button.A, wait=1.5)
+        
+        print("Return back to the menu and finish automation")
+        self.press(Button.HOME)
 
     def menu2namecheck(self):
         print("launch game")
