@@ -14,7 +14,7 @@ class MunchlaxLinearSearch(object):
         blink_cahce = [0]*256 # 瞬き間隔のキャッシュ
 
         for i in range(len(self.intervals)):
-            blink_cahce[i] = blink_pokemon()
+            blink_cahce[i] = blink_pokemon(rng)
 
         def check(k:int):
             for i in range(len(self.intervals)):
