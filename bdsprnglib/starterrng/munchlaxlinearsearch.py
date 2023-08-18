@@ -30,3 +30,7 @@ class MunchlaxLinearSearch(object):
             head += 1
             blink_cahce[tail & 0xFF] = blink_pokemon(rng)
             tail += 1
+        yield None
+
+    def reset(self):
+        self.intervals = []
