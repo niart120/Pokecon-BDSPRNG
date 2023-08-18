@@ -27,10 +27,11 @@ from typing import Tuple
 格納形式はコメントの通りです.
 """
 
-SEARCHMAX = 100000 #検索数上限
+SEARCHMAX = 50000 #検索数上限
 target_g7tid_list = [] # 先頭に0を付けない整数で格納してください. 例: 000827 -> target_g7tid_list = [827]
+target_g7tid_list = list(range(10))
 target_tidsid_list = [] # 先頭に0を付けない整数のタプルで格納してください.  例: tidが01234, sidが56789なら, target_tidsid_list = [(1234, 56789)] 
-
+EPSILON = 0.1 # 許容観測誤差
 
 def tidsid_list2set(tidsid_list):
     return set([(sid<<16) ^ tid  for (tid, sid) in tidsid_list])
@@ -64,12 +65,11 @@ class IDRNG(ImageProcPythonCommand):
             self.press(Button.A, wait=1.5)
 
         target_idx, tid, sid, g7tid = result
-
         idx = 0
+        remains = target_idx - idx
+
         reidentified_rng = None
         last_blink = 0.0
-
-        remains = target_idx - idx
 
         while True:
             # seed再特定
@@ -87,7 +87,7 @@ class IDRNG(ImageProcPythonCommand):
         
         # この時点で残り消費数が0未満なら失敗
         if remains<0:
-            print("Woops. something wrong...")
+            print("Woops. something went wrong...")
             return
 
         # timeline生成準備
@@ -110,6 +110,7 @@ class IDRNG(ImageProcPythonCommand):
         # 顔写真選択(WIP)
         self.press(Button.A, wait=1.0)
         print("Completed.")
+        print(f"g7tid:{g7tid}, tid:{tid}, sid:{sid}")
         # ホームに戻る
         self.press(Button.HOME)
         
@@ -119,7 +120,7 @@ class IDRNG(ImageProcPythonCommand):
         # ゲーム選択
         self.press(Button.A, wait=1.2)
         # ユーザー選択
-        self.press(Button.A, wait=32)
+        self.press(Button.A, wait=25)
         #(暗転)
 
         # 言語選択(WIP)
@@ -147,11 +148,11 @@ class IDRNG(ImageProcPythonCommand):
         # 名前確認画面からスタート
         self.press(Button.B, wait=1.2)
         # 顔写真選択
-        self.press(Button.A, wait=1.0)
+        self.press(Button.A, wait=1.3)
         # OSキーボード
         self.press(Button.A, wait=0.2)
         self.press(Button.PLUS, wait=0.8)
-        self.press(Button.B, wait=0.3)
+        self.press(Button.B, wait=0.5)
 
     def search_id(self, rng):#->(i, tid, sid, g7tid)
 
@@ -187,7 +188,7 @@ class IDRNG(ImageProcPythonCommand):
         prev_blink_time = 0
         # 瞬き中かを判別する
         is_blinked = False        
-
+        print(f"rng: {[hex(s_i).upper() for s_i in rng.get_state()]}")
         # RNG回りの何か
         searcher = MunchlaxLinearSearch()
         restored = None
@@ -206,7 +207,6 @@ class IDRNG(ImageProcPythonCommand):
 
             # 現在時刻取得
             current_time = time.perf_counter()
-            
             if is_blinking and not is_blinked:
                 # 瞬き間隔の測定
                 interval = current_time - prev_blink_time
@@ -218,13 +218,15 @@ class IDRNG(ImageProcPythonCommand):
                     # 再特定を試みる
                     restored = None
                     if len(searcher.intervals)>=4:
-                        restored = searcher.search(rng, SEARCHMAX).__next__()
-                    # 結果が得られたならループ離脱
-                    if restored is not None:
-                        # 現在のadvanceを表示
-                        print()
-                        print(f"current advance: {restored[0]}")
-                        return restored[0], restored[1], current_time
+                        restored = searcher.search(rng, SEARCHMAX, epsilon=EPSILON*2).__next__()
+                        # 結果が得られたならループ離脱
+                        if restored is not None:
+                            # 現在のadvanceを表示
+                            print()
+                            print(f"current advance: {restored[0]}")
+                            return restored[0], restored[1], current_time
+                        else:
+                            searcher.reset()
 
                 prev_blink_time = current_time
 
@@ -241,7 +243,7 @@ class IDRNG(ImageProcPythonCommand):
         is_blinked = False        
 
         # RNG回りの何か
-        inverter = MunchlaxInverter()
+        inverter = MunchlaxInverter(eps = EPSILON)
         restored = None
 
         print("start observation")
