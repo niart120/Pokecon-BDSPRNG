@@ -27,13 +27,28 @@ from typing import Tuple
 格納形式はコメントの通りです.
 """
 
-SEARCHMAX = 100000 #検索数上限
 target_g7tid_list = [] # 先頭に0を付けない整数で格納してください. 例: 000827 -> target_g7tid_list = [827]
 target_tidsid_list = [] # 先頭に0を付けない整数のタプルで格納してください.  例: tidが01234, sidが56789なら, target_tidsid_list = [(1234, 56789)] 
 EPSILON = 0.1 # 許容観測誤差
 
 def tidsid_list2set(tidsid_list):
     return set([(sid<<16) ^ tid  for (tid, sid) in tidsid_list])
+
+def calculate_SEARCHMAX():
+    """目標IDの出現頻度に応じて許容する消費数の上限を計算してくれる凄い奴
+
+    Returns:
+        int: 許容する消費数の上限の値
+    """
+    # 目標Seedの出現確率(の近似)
+    p_target = len(target_g7tid_list)/1_000_000 + len(target_tidsid_list)/(2**32)
+    # U \approx \sqrt{2pCV} が期待値を最小化する良い近似を与える
+    U = int((p_target*2*300*1.2)**(-0.5))
+
+    print(f"Calculate U(threshould)")
+    print(f"U={U}, p_target = {p_target}")
+
+    return U
 
 class IDRNG(ImageProcPythonCommand):
     NAME = 'BDSP_ID調整'
@@ -42,8 +57,16 @@ class IDRNG(ImageProcPythonCommand):
         super().__init__(cam)
  
     def do(self):
+        # もし目標IDが空なら中止
+        if len(target_g7tid_list) == 0 or len(target_tidsid_list) == 0:
+            print("target id list is empty.")
+            print("Automation abort.")
+        
         # 黒魔術
         self.camera.camera.set(cv2.CAP_PROP_BUFFERSIZE,1)
+        
+        #検索数上限の決定
+        self.SEARCHMAX = calculate_SEARCHMAX() 
 
         # コントローラー入力チェック
         for _ in range(5): self.press(Button.B, wait=0.1)
@@ -81,11 +104,11 @@ class IDRNG(ImageProcPythonCommand):
                 print("Woops. something went wrong...")
                 return
             # 残り消費数が少ないならループ離脱
-            is_finished = (remains - 15) // 7 == 0
+            is_finished = (remains - 15) // 6 == 0
             if is_finished:break
 
             # キャンセル回数決定
-            cancel_times = (remains - 15) // 7 #残り消費数 / 7 で見積り
+            cancel_times = (remains - 15) // 6 #残り消費数 / 6 で見積り
             print(f"cancel name entry {cancel_times} time(s)")
             # キャンセルによる乱数消費
             for _ in range(cancel_times): self.advance_seed()
@@ -166,7 +189,7 @@ class IDRNG(ImageProcPythonCommand):
         # 最初の50個はスキップ
         for i in range(50): tidsid, g7tid = generate_id(rand)
 
-        for i in range(50, SEARCHMAX):
+        for i in range(50, self.SEARCHMAX):
             tidsid, g7tid = generate_id(rand)
             if (g7tid in target_g7tid_set) or (tidsid in target_tidsid_set):
                 # ロギング
@@ -223,9 +246,9 @@ class IDRNG(ImageProcPythonCommand):
             # 瞬き間隔を復元器に投入
             searcher.add_interval(interval)
             print(f"blinked! interval:{interval:.3f}")
-            if len(searcher.intervals) >= 6:
+            if len(searcher.intervals) >= 7:
                 # 既定回数以上観測したなら再特定を試みる
-                restored = searcher.search(rng, SEARCHMAX, epsilon=0.5).__next__()
+                restored = searcher.search(rng, self.SEARCHMAX, epsilon=0.5).__next__()
                 # 結果が得られたならループ離脱
                 if restored is not None:
                     # 現在のadvanceを表示
