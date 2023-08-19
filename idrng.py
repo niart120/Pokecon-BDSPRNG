@@ -27,9 +27,8 @@ from typing import Tuple
 格納形式はコメントの通りです.
 """
 
-SEARCHMAX = 50000 #検索数上限
+SEARCHMAX = 100000 #検索数上限
 target_g7tid_list = [] # 先頭に0を付けない整数で格納してください. 例: 000827 -> target_g7tid_list = [827]
-target_g7tid_list = list(range(10))
 target_tidsid_list = [] # 先頭に0を付けない整数のタプルで格納してください.  例: tidが01234, sidが56789なら, target_tidsid_list = [(1234, 56789)] 
 EPSILON = 0.1 # 許容観測誤差
 
@@ -49,6 +48,7 @@ class IDRNG(ImageProcPythonCommand):
         # コントローラー入力チェック
         for _ in range(5): self.press(Button.B, wait=0.1)
         
+        # Seed厳選
         result = None
         while True:
             # メニュー画面から名前確認画面まで遷移
@@ -71,10 +71,15 @@ class IDRNG(ImageProcPythonCommand):
         reidentified_rng = None
         last_blink = 0.0
 
+        # 自動消費
         while True:
             # seed再特定
             idx, reidentified_rng, last_blink = self.reidentify_advance(restored)
             remains = target_idx - idx
+            # この時点で残り消費数が0未満なら失敗
+            if remains<0:
+                print("Woops. something went wrong...")
+                return
             # 残り消費数が少ないならループ離脱
             is_finished = (remains - 15) // 7 == 0
             if is_finished:break
@@ -84,11 +89,6 @@ class IDRNG(ImageProcPythonCommand):
             print(f"cancel name entry {cancel_times} time(s)")
             # キャンセルによる乱数消費
             for _ in range(cancel_times): self.advance_seed()
-        
-        # この時点で残り消費数が0未満なら失敗
-        if remains<0:
-            print("Woops. something went wrong...")
-            return
 
         # timeline生成準備
         waituntil = last_blink + blink_pokemon(reidentified_rng)
@@ -179,7 +179,7 @@ class IDRNG(ImageProcPythonCommand):
         print("Not found...")
         return None
 
-    def reidentify_advance(self, rng:Xorshift)->Tuple[int, float]:
+    def observe_blink_interval(self)->float:
         # 閾値
         THRESHOLD = 0.7
         # タイマー用変数
@@ -188,99 +188,72 @@ class IDRNG(ImageProcPythonCommand):
         prev_blink_time = 0
         # 瞬き中かを判別する
         is_blinked = False        
-        print(f"rng: {[hex(s_i).upper() for s_i in rng.get_state()]}")
+
+        print("start observation")
+        while True:
+            self.wait(0.01)
+            # 現在時刻取得
+            current_time = time.perf_counter()
+            # 画像取得
+            img = cv2.cvtColor(self.camera.readFrame(), cv2.COLOR_BGR2GRAY)
+            eyeimg = img[460:480, 500:510]
+            # 瞬き検知
+            eyevalue = np.mean(eyeimg) / 255.0
+            is_blinking = eyevalue < THRESHOLD
+
+            # 瞬きをしていてひとつ前のフレームでも瞬きをしていないなら更新
+            if is_blinking and not is_blinked:
+                # 瞬き間隔の測定
+                interval = current_time - prev_blink_time
+                if prev_blink_time != 0:
+                    # 瞬き間隔, 現在時刻をyield
+                    yield interval, current_time
+                # 前回の瞬きタイミングを更新する
+                prev_blink_time = current_time
+
+            # ひとつ前のフレームの状態を更新
+            is_blinked = is_blinking
+
+    def reidentify_advance(self, rng:Xorshift)->Tuple[int, float]:
         # RNG回りの何か
         searcher = MunchlaxLinearSearch()
         restored = None
 
-        print("start observation")
-        while True:
-            self.wait(0.01)
-
-            # 画像取得
-            img = cv2.cvtColor(self.camera.readFrame(), cv2.COLOR_BGR2GRAY)
-            eyeimg = img[460:480, 500:510]
-            
-            # 瞬き検知
-            eyevalue = np.mean(eyeimg) / 255.0
-            is_blinking = eyevalue < THRESHOLD
-
-            # 現在時刻取得
-            current_time = time.perf_counter()
-            if is_blinking and not is_blinked:
-                # 瞬き間隔の測定
-                interval = current_time - prev_blink_time
-                if prev_blink_time != 0:
-                    # 瞬き間隔を復元器に投入
-                    searcher.add_interval(interval)
-                    # メッセージの表示
-                    print(f"blinked! interval:{interval:.3f}")
-                    # 再特定を試みる
-                    restored = None
-                    if len(searcher.intervals)>=4:
-                        restored = searcher.search(rng, SEARCHMAX, epsilon=EPSILON*2).__next__()
-                        # 結果が得られたならループ離脱
-                        if restored is not None:
-                            # 現在のadvanceを表示
-                            print()
-                            print(f"current advance: {restored[0]}")
-                            return restored[0], restored[1], current_time
-                        else:
-                            searcher.reset()
-
-                prev_blink_time = current_time
-
-            is_blinked = is_blinking
+        for interval, current_time in self.observe_blink_interval():
+            # 瞬き間隔を復元器に投入
+            searcher.add_interval(interval)
+            print(f"blinked! interval:{interval:.3f}")
+            if len(searcher.intervals) >= 6:
+                # 既定回数以上観測したなら再特定を試みる
+                restored = searcher.search(rng, SEARCHMAX, epsilon=0.5).__next__()
+                # 結果が得られたならループ離脱
+                if restored is not None:
+                    # 現在のadvanceを表示
+                    print()
+                    print(f"current advance: {restored[0]}")
+                    return restored[0], restored[1], current_time
+                else:
+                    searcher.reset()
 
     def restore_baseseed(self)->Xorshift:
-        # 閾値
-        THRESHOLD = 0.7
-        # タイマー用変数
-        current_time = time.perf_counter()
-        # 前回の瞬き時間
-        prev_blink_time = 0
-        # 瞬き中かを判別する
-        is_blinked = False        
-
         # RNG回りの何か
         inverter = MunchlaxInverter(eps = EPSILON)
         restored = None
 
-        print("start observation")
-        while True:
-            self.wait(0.01)
+        for interval, _ in self.observe_blink_interval():
+            # 瞬き間隔を復元器に投入
+            inverter.add_interval(interval)
+            print(f"blinked! entropy:{inverter.entropy} interval:{interval:.3f}")
+            # 復元を試みる
+            restored = inverter.try_restore_state()
+            # 復元結果が得られたならループ離脱
+            if restored is not None:
+                # 復元された乱数生成器の内部状態を表示
+                print()
+                print(f"restored: {[hex(s_i).upper() for s_i in restored.get_state()]}")
+                print(f"blink: {inverter.blinkcount} times")
+                return restored
 
-            # 画像取得
-            img = cv2.cvtColor(self.camera.readFrame(),cv2.COLOR_BGR2GRAY)
-            eyeimg = img[460:480, 500:510]
-            
-            # 瞬き検知
-            eyevalue = np.mean(eyeimg) / 255.0
-            is_blinking = eyevalue < THRESHOLD
-
-            # 現在時刻取得
-            current_time = time.perf_counter()
-            
-            if is_blinking and not is_blinked:
-                # 瞬き間隔の測定
-                interval = current_time - prev_blink_time
-                if prev_blink_time != 0:
-                    # 瞬き間隔を復元器に投入
-                    inverter.add_interval(interval)
-                    # メッセージの表示
-                    print(f"blinked! entropy:{inverter.entropy} interval:{interval:.3f}")
-                    # 復元を試みる
-                    restored = inverter.try_restore_state()
-                    # 復元結果が得られたならループ離脱
-                    if restored is not None:
-                        # 復元された乱数生成器の内部状態を表示
-                        print()
-                        print(f"restored: {[hex(s_i).upper() for s_i in restored.get_state()]}")
-                        print(f"blink: {inverter.blinkcount} times")
-                        return restored
-                prev_blink_time = current_time
-
-            is_blinked = is_blinking
 
 """
 MIT License
