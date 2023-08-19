@@ -42,8 +42,8 @@ def calculate_SEARCHMAX():
     """
     # 目標Seedの出現確率(の近似)
     p_target = len(target_g7tid_list)/1_000_000 + len(target_tidsid_list)/(2**32)
-    # U \approx \sqrt{2pCV} が期待値を最小化する良い近似を与える
-    U = int((p_target*2*300*1.2)**(-0.5))
+    # U \approx \sqrt{\frac{2CV}{p}} が期待値を最小化する良い近似を与える
+    U = int((2*300*1.2/p)**(0.5))
 
     print(f"Calculate U(threshould)")
     print(f"U={U}, p_target = {p_target}")
