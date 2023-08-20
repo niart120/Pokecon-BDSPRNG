@@ -46,7 +46,7 @@ def calculate_SEARCHMAX():
     U = int((2*300*1.2/p)**(0.5))
 
     print(f"Calculate U(threshould)")
-    print(f"U={U}, p_target = {p}")
+    print(f"U={U}, p = {p}")
 
     return U
 
@@ -104,7 +104,7 @@ class IDRNG(ImageProcPythonCommand):
                 print("Woops. something went wrong...")
                 return
             # 残り消費数が少ないならループ離脱
-            is_finished = (remains - 15) // 6 == 0
+            is_finished = (remains - 15) // 6 == 0 or remains < 15
             if is_finished:break
 
             # キャンセル回数決定
@@ -165,7 +165,7 @@ class IDRNG(ImageProcPythonCommand):
                 break
 
         self.press(Button.A, wait=0.3)
-        self.press(Button.PLUS, wait=3.0)
+        self.press(Button.PLUS, wait=1.0)
 
     def advance_seed(self):
         # 名前確認画面からスタート
