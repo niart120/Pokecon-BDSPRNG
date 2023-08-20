@@ -41,12 +41,12 @@ def calculate_SEARCHMAX():
         int: 許容する消費数の上限の値
     """
     # 目標Seedの出現確率(の近似)
-    p_target = len(target_g7tid_list)/1_000_000 + len(target_tidsid_list)/(2**32)
+    p = len(target_g7tid_list)/1_000_000 + len(target_tidsid_list)/(2**32)
     # U \approx \sqrt{\frac{2CV}{p}} が期待値を最小化する良い近似を与える
     U = int((2*300*1.2/p)**(0.5))
 
     print(f"Calculate U(threshould)")
-    print(f"U={U}, p_target = {p_target}")
+    print(f"U={U}, p_target = {p}")
 
     return U
 
