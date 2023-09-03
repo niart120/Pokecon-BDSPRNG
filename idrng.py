@@ -43,7 +43,7 @@ def calculate_SEARCHMAX():
     # 目標Seedの出現確率(の近似)
     p = len(target_g7tid_list)/1_000_000 + len(target_tidsid_list)/(2**32)
     # U \approx \sqrt{\frac{3CA}{p}} がE(T)+3SD(T)を最小化する良い近似を与える
-    U = int((3*300*1.2/p)**(0.5))
+    U = int((3*350*1.2/p)**(0.5))
 
     print(f"Calculate U(threshould)")
     print(f"U={U}, p = {p}")
@@ -58,7 +58,7 @@ class IDRNG(ImageProcPythonCommand):
  
     def do(self):
         # もし目標IDが空なら中止
-        if len(target_g7tid_list) == 0 or len(target_tidsid_list) == 0:
+        if len(target_g7tid_list) == 0 and len(target_tidsid_list) == 0:
             print("target id list is empty.")
             print("Automation abort.")
         
@@ -74,6 +74,7 @@ class IDRNG(ImageProcPythonCommand):
         # Seed厳選
         result = None
         while True:
+            launch_game_time = time.perf_counter()
             # メニュー画面から名前確認画面まで遷移
             self.menu2namecheck()
             # seed特定
@@ -86,6 +87,9 @@ class IDRNG(ImageProcPythonCommand):
             self.press(Button.HOME, wait=0.5)
             self.press(Button.X, wait=0.5)
             self.press(Button.A, wait=1.5)
+
+            elapsed = time.perf_counter() - launch_game_time
+            print(f"elapsed:{elapsed:.3f} s")
 
         target_idx, tid, sid, g7tid = result
         idx = 0
