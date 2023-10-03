@@ -179,7 +179,7 @@ class IDRNG(ImageProcPythonCommand):
         # OSキーボード
         self.press(Button.A, wait=0.2)
         self.press(Button.PLUS, wait=0.8)
-        self.press(Button.B, wait=0.5)
+        self.press(Button.X, wait=0.5)
 
     def search_id(self, rng):#->(i, tid, sid, g7tid)
 
