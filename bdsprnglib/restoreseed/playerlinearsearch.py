@@ -5,7 +5,7 @@ from ..restoreseedmodule.blinkgeneratorext import *
 class PlayerLinearSearch(object):
 
     def __init__(self):
-        self.intervals = []
+        self.intervals = deque()
         self.blinkcount = 0
 
     def add_interval(self, interval:int):
@@ -20,7 +20,7 @@ class PlayerLinearSearch(object):
 
         idx = get_next_player_blink(rng)
 
-        for i in range(len(intervals)):
+        for i in range(len(self.intervals)):
             interval = get_next_player_blink(rng)
             idx += interval
 
@@ -28,7 +28,7 @@ class PlayerLinearSearch(object):
             interval_queue.append(interval)
 
         head = 0
-        tail = len(intervals)
+        tail = len(self.intervals)
         while head < maxrange:
             if self.intervals == interval_queue: yield (idx, rng.deepcopy())
 
@@ -39,6 +39,9 @@ class PlayerLinearSearch(object):
 
             index_queue.popleft()
             interval_queue.popleft()
+
+            head += 1
+            tail += 1
 
     def search_noisy(self, rng:Xorshift, maxrange:int, dt = 1.0/60.0):
         for i in range(1, maxrange+1):
