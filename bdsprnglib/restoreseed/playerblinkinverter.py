@@ -19,14 +19,13 @@ class PlayerBlinkInverter(object):
             blinktype (PlayerBlink): _description_
         """
 
-        self.blinkcount += 1
-
         # 瞬きが無い場合はt(遷移行列)を更新して終了
         if blinktype==PlayerBlink.Nothing:
             self.t = self.t@get_trans() % 2
             return
 
         # 任意の瞬きがあった場合
+
         # matrixに現在の行列の125-128行成分を追加
         self.matrix.append(self.t[-4:])
         # vec配列に現在の瞬きを追加
@@ -35,6 +34,8 @@ class PlayerBlinkInverter(object):
         self.entropy += 4
         # t(遷移行列)を更新
         self.t = self.t@get_trans() % 2
+        # 瞬き回数更新
+        self.blinkcount += 1
 
     def try_restore_state(self)->Xorshift:
         if self.entropy < 128:
