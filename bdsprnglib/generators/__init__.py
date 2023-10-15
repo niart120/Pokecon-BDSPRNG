@@ -1,2 +1,2 @@
 from .staticsymbolgenerator import StaticSymbolGenerator
-from .egggenerator import RoamerGenerator
+from .roamergenerator import RoamerGenerator

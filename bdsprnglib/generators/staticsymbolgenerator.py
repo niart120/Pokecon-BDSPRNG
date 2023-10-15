@@ -9,7 +9,7 @@ class StaticSymbolGenerator:
         self.use_synchronize = use_synchronize
         self.never_shiny = never_shiny
 
-    def pseudogenerate(rng:Xorshift):
+    def pseudogenerate(self, rng:Xorshift):
         # 簡単のため色違い判定とサイズ判定の結果のみ返す
         
         rng = rng.deepcopy() # 副作用が無いように見せかけるためコピーを取る

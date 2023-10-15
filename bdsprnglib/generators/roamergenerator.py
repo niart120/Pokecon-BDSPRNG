@@ -1,13 +1,13 @@
 from .generatorext import ShinyType, _generate_ivs, _to_shiny_type, _to_size_type
 from ..rng.xorshift import Xorshift
-from ..rng.xoroshiroBDSP import XoroshiroBDSP
+from ..rng.xoroshirobdsp import XoroshiroBDSP
 
 class RoamerGenerator:
     def __init__(self, flawless_ivs:int=3, use_synchronize:bool=False):
         self.flawless_ivs = flawless_ivs
         self.use_synchronize = use_synchronize
 
-    def pseudogenerate(rng:Xorshift):
+    def pseudogenerate(self, rng:Xorshift):
         # 簡単のため色違い判定とサイズ判定の結果のみ返す
         
         rng = rng.deepcopy() # 副作用が無いように見せかけるためコピーを取る
