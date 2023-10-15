@@ -12,7 +12,7 @@ from .bdsprnglib.restoreseed import PlayerBlinkInverter, PlayerLinearSearch
 from .bdsprnglib.restoreseedmodule import PlayerBlink
 from .bdsprnglib.rng import Xorshift
 from .bdsprnglib.generators import RoamerGenerator
-from .bdsprnglib.generators.generatorext import ShinyType
+from .bdsprnglib.generators.generatorext import ShinyType, SizeType
 
 import time
 import re
@@ -20,12 +20,9 @@ from typing import Tuple
 
 """
 - ゲームの起動から主人公の自宅2Fでの基準Seed特定までの操作を自動で実行します.
-
 - メニュー画面でBDSPのソフトにカーソルが合っている状態で実行してください.
 - 便利ボタンの左キーに"博士の言葉"を表示させる任意の道具(ex. すごいつりざお, じてんしゃ, ポケトレetc)が登録されている必要があります.
 
-また, `target_g7tid_list` または `target_tidsid_list` のいずれかのリストに目的のIDを格納してください.
-格納形式はコメントの通りです.
 """
 
 def calculate_SEARCHMAX(p):
@@ -47,7 +44,7 @@ def calculate_SEARCHMAX(p):
     return U
 
 class BaseSeedCollector(ImageProcPythonCommand):
-    NAME = 'BDSP_基準Seed厳選(通常固定シンボル)'
+    NAME = 'BDSP_基準Seed厳選(徘徊固定シンボル)'
  
     def __init__(self, cam):
         super().__init__(cam)
@@ -62,9 +59,6 @@ class BaseSeedCollector(ImageProcPythonCommand):
         #検索数上限の決定
         self.SEARCHMAX = calculate_SEARCHMAX((1/4096) * (1/8192)) 
 
-        self.restore_baseseed()
-        return
-
         # コントローラー入力チェック
         for _ in range(5): self.press(Button.B, wait=0.1)
         
@@ -75,11 +69,15 @@ class BaseSeedCollector(ImageProcPythonCommand):
             # メニュー画面から操作可能画面まで遷移
             self.menu2playable()
             # seed特定
-            restored = self.restore_baseseed()
-            if restored is not None:
-                # 個体検索の実行
-                result = self.search_static_symbol(restored, shiny_condition, size_condition)
-                if result is not None: break
+            restored = None
+            while restored is None:
+                restored = self.restore_baseseed()
+            
+            # 個体検索の実行
+            result = self.search_roamer_symbol(restored, shiny_condition, size_condition)
+            if result is not None: break
+            print("Not found...")
+            print("Reset game")
 
             # メニューに戻る->ゲーム終了
             self.press(Button.HOME, wait=0.5)
@@ -91,18 +89,19 @@ class BaseSeedCollector(ImageProcPythonCommand):
 
         adv, shiny_type, size_type = result
 
-        print("Found at :advance={adv}, shiny_type={shiny_type}, size_type={size_type}")
+        print(f"Found at :advance={adv}, shiny_type={shiny_type}, size_type={size_type}")
+        self.press(Button.HOME)
 
     def menu2playable(self):
         print("launch game")
         # ゲーム選択
         self.press(Button.A, wait=1.2)
         # ユーザー選択
-        self.press(Button.A, wait=30)
+        self.press(Button.A, wait=20)
         #(暗転)
 
         # キャラクターが操作可能になるまで連打
-        print("mash A until poke-con detect keyboard window")
+        print("mash A until playable")
         for _ in range(100): self.press(Button.A, wait=0.1)
 
         # ↓方向へ移動させて向きを固定
@@ -181,12 +180,12 @@ class BaseSeedCollector(ImageProcPythonCommand):
             inverter.add_blink(prev_blink_type)
 
             # 四捨五入して瞬き間隔を計算
-            interval = int(intvl + 0.5);
+            interval = int(intvl + 0.5)
 
             # 検証用リストへの追加
             intervals.append(interval)
 
-            print(f"prev_blink_type:{str(prev_blink_type)[12:]}\tentropy:{inverter.entropy}\tinterval:{interval:}")
+            print(f"prev_blink_type:{prev_blink_type}\tentropy:{inverter.entropy}\tinterval:{interval}")
             # 復元を試みる
             restored = inverter.try_restore_state()
             # 復元結果が得られたならループ離脱
@@ -197,12 +196,12 @@ class BaseSeedCollector(ImageProcPythonCommand):
             for i in range(interval-1):
                 inverter.add_blink(PlayerBlink.Nothing)
 
-            prev = current_time;
-            prev_blink_type = PlayerBlink.Single;
+            prev = current_time
+            prev_blink_type = PlayerBlink.Single
 
             # もし観測回数が50回を超える(エントロピーが200より大きい)場合は強制打ち切り
             if inverter.entropy > 200:
-                print("Failure...");
+                print("Failure...")
                 return None
 
         # 特定結果の検証
@@ -214,19 +213,19 @@ class BaseSeedCollector(ImageProcPythonCommand):
         try:
             _, baseseed = next(pls.search(restored, elapsed + 1))
         except StopIteration:
-            print("Failure...");
+            print("Failure...")
             return None
 
         # 復元された乱数生成器の内部状態を表示
         print()
         s_0, s_1, s_2, s_3 = restored.get_state()
         x_0, x_1 = (s_0 << 32) | s_1, (s_2 << 32) | s_3
-        print(f"restored! seed0:{hex(x_0)}, seed1:{hex{x_1}}")
+        print(f"restored! seed0:{hex(x_0)}, seed1:{hex(x_1)}")
         #print(f"restored: {[hex(s_i).upper() for s_i in restored.get_state()]}")
         print(f"blink: {inverter.blinkcount} times")
         return restored
 
-    def search_static_symbol(self, rng:Xorshift, shiny_condition:ShinyType, size_condition:SizeType):
+    def search_roamer_symbol(self, rng:Xorshift, shiny_condition:ShinyType, size_condition:SizeType):
         rng = rng.deepcopy()
 
         # 移動時間を見越して10万消費分は予めスキップする
