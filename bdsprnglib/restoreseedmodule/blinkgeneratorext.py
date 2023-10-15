@@ -6,6 +6,9 @@ class PlayerBlink(IntEnum):
     Single = 0
     Double = 1
 
+    def __str__(self):
+        return f'{self.name}'
+
 def blink_player(rng:Xorshift):
     r = rng.get_rand() & 0xF
     return PlayerBlink.Single if r == 0 else PlayerBlink.Double if r == 1 else PlayerBlink.Nothing
