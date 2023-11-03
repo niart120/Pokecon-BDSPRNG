@@ -114,7 +114,7 @@ class BaseSeedCollector(ImageProcPythonCommand):
 
     def observe_blink_interval(self)->float:
         # 閾値
-        THRESHOLD = 1000.0
+        THRESHOLD = 2400.0
         # タイマー用変数
         current_time = time.perf_counter()
         # 前回の瞬き時間
