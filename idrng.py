@@ -71,25 +71,7 @@ class IDRNG(ImageProcPythonCommand):
         # コントローラー入力チェック
         for _ in range(5): self.press(Button.B, wait=0.1)
         
-        # Seed厳選
-        result = None
-        while True:
-            launch_game_time = time.perf_counter()
-            # メニュー画面から名前確認画面まで遷移
-            self.menu2namecheck()
-            # seed特定
-            restored = self.restore_baseseed()
-            # id検索の実行
-            result = self.search_id(restored)
-            if result is not None:break
-
-            # メニューに戻る->ゲーム終了
-            self.press(Button.HOME, wait=0.5)
-            self.press(Button.X, wait=0.5)
-            self.press(Button.A, wait=1.5)
-
-            elapsed = time.perf_counter() - launch_game_time
-            print(f"elapsed:{elapsed:.3f} s")
+        result = self.try_search_seed()
 
         target_idx, tid, sid, g7tid = result
         idx = 0
@@ -108,11 +90,11 @@ class IDRNG(ImageProcPythonCommand):
                 print("Woops. something went wrong...")
                 return
             # 残り消費数が少ないならループ離脱
-            is_finished = (remains - 15) // 6 == 0 or remains < 15
+            is_finished = (remains - 20) // 6 == 0 or remains < 15
             if is_finished:break
 
             # キャンセル回数決定
-            cancel_times = (remains - 15) // 6 #残り消費数 / 6 で見積り
+            cancel_times = (remains - 20) // 6 #残り消費数 / 6 で見積り
             print(f"cancel name entry {cancel_times} time(s)")
             # キャンセルによる乱数消費
             for _ in range(cancel_times): self.advance_seed()
@@ -206,6 +188,27 @@ class IDRNG(ImageProcPythonCommand):
         print("Not found...")
         return None
 
+    def try_search_seed(self):
+        # Seed厳選
+        result = None
+        while True:
+            launch_game_time = time.perf_counter()
+            # メニュー画面から名前確認画面まで遷移
+            self.menu2namecheck()
+            # seed特定
+            restored = self.restore_baseseed()
+            # id検索の実行
+            result = self.search_id(restored)
+            if result is not None: return result
+
+            # メニューに戻る->ゲーム終了
+            self.press(Button.HOME, wait=0.5)
+            self.press(Button.X, wait=0.5)
+            self.press(Button.A, wait=1.5)
+
+            elapsed = time.perf_counter() - launch_game_time
+            print(f"elapsed:{elapsed:.3f} s")
+
     def observe_blink_interval(self)->float:
         # 閾値
         THRESHOLD = 0.7
@@ -250,7 +253,7 @@ class IDRNG(ImageProcPythonCommand):
             # 瞬き間隔を復元器に投入
             searcher.add_interval(interval)
             print(f"blinked! interval:{interval:.3f}")
-            if len(searcher.intervals) >= 7:
+            if len(searcher.intervals) >= 9:
                 # 既定回数以上観測したなら再特定を試みる
                 restored = searcher.search(rng, self.SEARCHMAX, epsilon=0.5).__next__()
                 # 結果が得られたならループ離脱
