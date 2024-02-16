@@ -61,6 +61,7 @@ class IDRNG(ImageProcPythonCommand):
         if len(target_g7tid_list) == 0 and len(target_tidsid_list) == 0:
             print("target id list is empty.")
             print("Automation abort.")
+            return
         
         # 黒魔術
         self.camera.camera.set(cv2.CAP_PROP_BUFFERSIZE,1)
@@ -71,7 +72,7 @@ class IDRNG(ImageProcPythonCommand):
         # コントローラー入力チェック
         for _ in range(5): self.press(Button.B, wait=0.1)
         
-        result = self.try_search_seed()
+        result, restored = self.try_search_seed()
 
         target_idx, tid, sid, g7tid = result
         idx = 0
@@ -199,11 +200,11 @@ class IDRNG(ImageProcPythonCommand):
             restored = self.restore_baseseed()
             # id検索の実行
             result = self.search_id(restored)
-            if result is not None: return result
+            if result is not None: return result, restored
 
             # メニューに戻る->ゲーム終了
-            self.press(Button.HOME, wait=0.5)
-            self.press(Button.X, wait=0.5)
+            self.press(Button.HOME, wait=1.0)
+            self.press(Button.X, wait=1.0)
             self.press(Button.A, wait=1.5)
 
             elapsed = time.perf_counter() - launch_game_time
